@@ -3,7 +3,28 @@
     "deny": [
       "Read(.env*)",
       "Read(serviceAccountKey.json)",
-      "Read(node_modules/**)"
+      "Read(node_modules/**)",
+      "Read(**/*.pem)",
+      "Read(./secrets/**)",
+      "Bash(cat .env*)",
+      "Bash(cat serviceAccountKey.json)",
+      "Bash(grep * .env*)",
+      "Bash(env)",
+      "Bash(printenv)",
+      "Bash(cp .env*)",
+      "Bash(mv .env*)",
+      "Bash(echo * .env*)",
+      "WebFetch"
     ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "filesystem": {
+      "denyRead": [
+        "**/.env*",
+        "**/serviceAccountKey.json",
+        "**/*.pem"
+      ]
+    }
   }
 }
