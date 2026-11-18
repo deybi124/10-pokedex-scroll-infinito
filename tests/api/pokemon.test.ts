@@ -1,7 +1,20 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({
+  obtenerCacheListaPokemon: vi.fn(),
+  guardarCacheListaPokemon: vi.fn(),
+}));
+
+vi.mock("@/repositories/pokemonCacheRepository", () => mocks);
+
 import { GET } from "@/app/api/pokemon/route";
 import { GET as GETDetalle } from "@/app/api/pokemon/[id]/route";
 import { listarPokemon } from "@/services/pokemonService";
+
+beforeEach(() => {
+  mocks.obtenerCacheListaPokemon.mockReset().mockResolvedValue(null);
+  mocks.guardarCacheListaPokemon.mockReset().mockResolvedValue(undefined);
+});
 
 function resultados(desde: number, cantidad: number) {
   return Array.from({ length: cantidad }, (_, indice) => {
@@ -116,6 +129,76 @@ describe("GET /api/pokemon", () => {
     expect(cuerpo.error).toBe("Datos inválidos");
     expect(cuerpo.detalles).toEqual(
       expect.arrayContaining([expect.objectContaining({ campo: "q" })]),
+    );
+  });
+
+  it("devuelve datos de Firestore sin depender de PokéAPI cuando existe caché", async () => {
+    const datosCache = {
+      items: [
+        {
+          id: 25,
+          nombre: "pikachu",
+          sprite:
+            "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png",
+        },
+      ],
+      siguienteCursor: "20",
+    };
+    mocks.obtenerCacheListaPokemon.mockResolvedValue(datosCache);
+    const fetch = vi.fn().mockRejectedValue(new Error("PokéAPI no disponible"));
+    vi.stubGlobal("fetch", fetch);
+
+    const respuesta = await GET(
+      new Request("http://localhost:3000/api/pokemon", {
+        headers: { "x-real-ip": "203.0.113.212" },
+      }),
+    );
+
+    expect(respuesta.status).toBe(200);
+    expect(await respuesta.json()).toEqual(datosCache);
+    expect(mocks.obtenerCacheListaPokemon).toHaveBeenCalledWith({
+      offset: 0,
+      limite: 20,
+      q: undefined,
+    });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(mocks.guardarCacheListaPokemon).not.toHaveBeenCalled();
+  });
+
+  it("guarda en Firestore el resultado de PokéAPI cuando no existe caché", async () => {
+    const datosPokeApi = {
+      count: 2,
+      results: [
+        {
+          name: "bulbasaur",
+          url: "https://pokeapi.co/api/v2/pokemon/1/",
+        },
+        {
+          name: "ivysaur",
+          url: "https://pokeapi.co/api/v2/pokemon/2/",
+        },
+      ],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => datosPokeApi,
+      }),
+    );
+
+    const respuesta = await GET(
+      new Request("http://localhost:3000/api/pokemon?limite=20", {
+        headers: { "x-real-ip": "203.0.113.213" },
+      }),
+    );
+    const resultado = await respuesta.json();
+
+    expect(respuesta.status).toBe(200);
+    expect(mocks.guardarCacheListaPokemon).toHaveBeenCalledWith(
+      { offset: 0, limite: 20, q: undefined },
+      resultado,
     );
   });
 

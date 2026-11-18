@@ -1,6 +1,6 @@
 import { limitarTasa, manejar } from "@/lib/http";
 import { esquemaConsultaPokemon } from "@/schemas/pokemon";
-import { listarPokemon } from "@/services/pokemonService";
+import { listarPokemonConCache } from "@/services/pokemonCacheService";
 
 export const GET = manejar(async (request: Request) => {
   limitarTasa(request);
@@ -12,7 +12,7 @@ export const GET = manejar(async (request: Request) => {
     q,
   });
 
-  const resultado = await listarPokemon(consulta);
+  const resultado = await listarPokemonConCache(consulta);
 
   return Response.json(resultado, {
     headers: {
