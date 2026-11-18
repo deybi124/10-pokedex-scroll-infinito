@@ -38,13 +38,32 @@ function leerCredencialesArchivo() {
 }
 
 function leerCredencialesEntorno() {
+  // 1. NUEVO MÉTODO (Recomendado para Vercel): Una sola variable con todo el JSON
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+    try {
+      const cuenta = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+      const validado = esquemaCuentaServicioFirebase.safeParse(cuenta);
+      if (validado.success) {
+        return {
+          projectId: validado.data.project_id,
+          clientEmail: validado.data.client_email,
+          // JSON.parse ya convierte los \n literales en saltos de línea reales
+          privateKey: validado.data.private_key,
+        };
+      }
+    } catch (error) {
+      console.error("Error parseando FIREBASE_SERVICE_ACCOUNT_KEY:", error);
+    }
+  }
+
+  // 2. MÉTODO ANTIGUO (Variables separadas)
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   const privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
   if (!projectId || !clientEmail || !privateKey) {
     throw new Error(
-      "Coloca serviceAccountKey.json en la raíz o configura las variables FIREBASE_*",
+      "Configura FIREBASE_SERVICE_ACCOUNT_KEY (JSON completo) o las variables FIREBASE_* en Vercel",
     );
   }
 
@@ -52,6 +71,7 @@ function leerCredencialesEntorno() {
 }
 
 function leerCredenciales() {
+  // En local, si existe el archivo físico, lo usa. En Vercel, usa las variables.
   return existsSync(RUTA_CUENTA_SERVICIO)
     ? leerCredencialesArchivo()
     : leerCredencialesEntorno();

@@ -118,6 +118,36 @@ describe("GET /api/pokemon", () => {
       expect.arrayContaining([expect.objectContaining({ campo: "q" })]),
     );
   });
+
+  it("responde 429 al superar 60 solicitudes por minuto desde la misma IP", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ count: 0, results: [] }),
+      }),
+    );
+
+    const respuestas = await Promise.all(
+      Array.from({ length: 61 }, () =>
+        GET(
+          new Request("http://localhost:3000/api/pokemon", {
+            headers: { "x-real-ip": "203.0.113.211" },
+          }),
+        ),
+      ),
+    );
+    const limitada = respuestas.find((respuesta) => respuesta.status === 429);
+
+    expect(respuestas.filter((respuesta) => respuesta.status === 200)).toHaveLength(
+      60,
+    );
+    expect(limitada).toBeDefined();
+    expect(await limitada?.json()).toMatchObject({
+      error: "Demasiadas solicitudes",
+    });
+  });
 });
 
 describe("GET /api/pokemon/[id]", () => {

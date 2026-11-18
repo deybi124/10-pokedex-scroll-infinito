@@ -1,8 +1,9 @@
-import { manejar } from "@/lib/http";
+import { limitarTasa, manejar } from "@/lib/http";
 import { esquemaIdPokemon } from "@/schemas/pokemon";
 import { obtenerDetallePokemon } from "@/services/pokemonService";
 
 export const GET = manejar(async (request: Request) => {
+  limitarTasa(request);
   const segmentoId = new URL(request.url).pathname.split("/").pop() ?? "";
   const id = esquemaIdPokemon.parse(segmentoId);
   const pokemon = await obtenerDetallePokemon(id);

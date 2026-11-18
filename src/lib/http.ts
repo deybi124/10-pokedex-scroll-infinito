@@ -2,9 +2,59 @@ import { ZodError } from "zod";
 import { ErrorHttp } from "@/lib/errores";
 
 const CABECERA_ID = "x-request-id";
+const LIMITE_PETICIONES_PUBLICAS = 60;
+const VENTANA_RATE_LIMIT_MS = 60_000;
+const MAX_CONTADORES_RATE_LIMIT = 10_000;
+
+type ContadorRateLimit = {
+  inicio: number;
+  cantidad: number;
+};
+
+const contadoresRateLimit = new Map<string, ContadorRateLimit>();
+
+function limpiarContadoresRateLimit(ahora: number): void {
+  if (contadoresRateLimit.size < MAX_CONTADORES_RATE_LIMIT) {
+    return;
+  }
+
+  for (const [ip, contador] of contadoresRateLimit) {
+    if (ahora - contador.inicio >= VENTANA_RATE_LIMIT_MS) {
+      contadoresRateLimit.delete(ip);
+    }
+  }
+
+  if (contadoresRateLimit.size >= MAX_CONTADORES_RATE_LIMIT) {
+    const masAntiguo = contadoresRateLimit.keys().next().value;
+    if (masAntiguo !== undefined) {
+      contadoresRateLimit.delete(masAntiguo);
+    }
+  }
+}
 
 export function idPeticion(request: Request): string {
   return request.headers.get(CABECERA_ID) ?? crypto.randomUUID();
+}
+
+export function limitarTasa(request: Request): void {
+  const ahora = Date.now();
+  const ip =
+    request.headers.get("x-real-ip")?.trim() ||
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "desconocida";
+  const contador = contadoresRateLimit.get(ip);
+
+  if (!contador || ahora - contador.inicio >= VENTANA_RATE_LIMIT_MS) {
+    limpiarContadoresRateLimit(ahora);
+    contadoresRateLimit.set(ip, { inicio: ahora, cantidad: 1 });
+    return;
+  }
+
+  if (contador.cantidad >= LIMITE_PETICIONES_PUBLICAS) {
+    throw new ErrorHttp(429, "Demasiadas solicitudes");
+  }
+
+  contador.cantidad += 1;
 }
 
 export function origenDelSitio(request: Request): string {
