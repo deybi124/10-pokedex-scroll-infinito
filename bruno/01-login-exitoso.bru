@@ -1,0 +1,19 @@
+meta {
+  name: Login exitoso
+  type: http
+  seq: 1
+}
+
+post {
+  url: http://localhost:3000/api/auth/sesion
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  idToken: "REEMPLAZA_CON_UN_ID_TOKEN_FIREBASE_RECIENTE"
+}

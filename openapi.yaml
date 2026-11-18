@@ -1,0 +1,479 @@
+openapi: 3.1.0
+info:
+  title: API de la Pokédex
+  version: 1.0.0
+  description: API de Pokémon y favoritos. Las rutas privadas aceptan cookie de sesión o token Bearer.
+servers:
+  - url: http://localhost:3000
+    description: Desarrollo local
+paths:
+  /api/pokemon:
+    get:
+      operationId: listarPokemon
+      summary: Listar y buscar Pokémon
+      parameters:
+        - name: offset
+          in: query
+          description: Número de resultados que se omiten.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: limite
+          in: query
+          description: Cantidad de resultados (máximo 100).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: q
+          in: query
+          description: Prefijo del nombre del Pokémon.
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 30
+            pattern: "^[A-Za-z-]+$"
+      responses:
+        "200":
+          description: Página de Pokémon.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RespuestaListaPokemon"
+        "400":
+          $ref: "#/components/responses/ErrorValidacion"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
+        "500":
+          $ref: "#/components/responses/ErrorInterno"
+        "502":
+          $ref: "#/components/responses/ServicioNoDisponible"
+        "504":
+          $ref: "#/components/responses/TiempoAgotado"
+  /api/pokemon/{id}:
+    get:
+      operationId: obtenerPokemon
+      summary: Obtener ficha de un Pokémon
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID entero positivo del Pokémon.
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Ficha del Pokémon.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PokemonDetalle"
+        "400":
+          $ref: "#/components/responses/ErrorValidacion"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
+        "500":
+          $ref: "#/components/responses/ErrorInterno"
+        "502":
+          $ref: "#/components/responses/ServicioNoDisponible"
+        "504":
+          $ref: "#/components/responses/TiempoAgotado"
+  /api/favoritos:
+    get:
+      operationId: listarFavoritos
+      summary: Listar los favoritos del usuario autenticado
+      security:
+        - BearerToken: []
+        - CookieSesion: []
+      responses:
+        "200":
+          description: Favoritos del usuario.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RespuestaFavoritos"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "500":
+          $ref: "#/components/responses/ErrorInterno"
+    post:
+      operationId: agregarFavorito
+      summary: Agregar un Pokémon a favoritos
+      security:
+        - BearerToken: []
+        - CookieSesion: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NuevoFavorito"
+            example:
+              pokemonId: 25
+      responses:
+        "201":
+          description: Favorito creado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RespuestaFavorito"
+        "400":
+          $ref: "#/components/responses/ErrorValidacion"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/OrigenNoPermitido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          $ref: "#/components/responses/Conflicto"
+        "415":
+          $ref: "#/components/responses/TipoNoPermitido"
+        "500":
+          $ref: "#/components/responses/ErrorInterno"
+        "502":
+          $ref: "#/components/responses/ServicioNoDisponible"
+        "504":
+          $ref: "#/components/responses/TiempoAgotado"
+    delete:
+      operationId: quitarFavorito
+      summary: Quitar un Pokémon de favoritos
+      security:
+        - BearerToken: []
+        - CookieSesion: []
+      parameters:
+        - name: pokemonId
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "204":
+          description: Favorito eliminado (la operación es idempotente).
+        "400":
+          $ref: "#/components/responses/ErrorValidacion"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/OrigenNoPermitido"
+        "500":
+          $ref: "#/components/responses/ErrorInterno"
+  /api/auth/sesion:
+    post:
+      operationId: crearSesion
+      summary: Crear cookie de sesión a partir de un ID token de Firebase
+      description: Requiere que el inicio de sesión de Firebase sea reciente. La cookie `sesion` se establece como HttpOnly.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NuevaSesion"
+      responses:
+        "204":
+          description: Sesión creada.
+          headers:
+            Set-Cookie:
+              description: Cookie HttpOnly `sesion`.
+              schema:
+                type: string
+        "400":
+          $ref: "#/components/responses/ErrorValidacion"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/OrigenNoPermitido"
+        "415":
+          $ref: "#/components/responses/TipoNoPermitido"
+        "500":
+          $ref: "#/components/responses/ErrorInterno"
+    delete:
+      operationId: cerrarSesion
+      summary: Cerrar la sesión y borrar la cookie
+      responses:
+        "204":
+          description: Sesión cerrada y cookie eliminada.
+          headers:
+            Set-Cookie:
+              description: Cookie `sesion` expirada.
+              schema:
+                type: string
+        "403":
+          $ref: "#/components/responses/OrigenNoPermitido"
+        "500":
+          $ref: "#/components/responses/ErrorInterno"
+  /api/auth/yo:
+    get:
+      operationId: obtenerUsuarioActual
+      summary: Obtener la identidad de la sesión actual
+      security:
+        - BearerToken: []
+        - CookieSesion: []
+      responses:
+        "200":
+          description: Usuario autenticado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RespuestaUsuario"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "500":
+          $ref: "#/components/responses/ErrorInterno"
+components:
+  securitySchemes:
+    BearerToken:
+      type: http
+      scheme: bearer
+      bearerFormat: Firebase ID token
+    CookieSesion:
+      type: apiKey
+      in: cookie
+      name: sesion
+  schemas:
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+        detalles:
+          type: array
+          items:
+            $ref: "#/components/schemas/DetalleError"
+    DetalleError:
+      type: object
+      required:
+        - campo
+        - mensaje
+      properties:
+        campo:
+          type: string
+        mensaje:
+          type: string
+    PokemonLista:
+      type: object
+      required:
+        - id
+        - nombre
+        - sprite
+      properties:
+        id:
+          type: integer
+          minimum: 1
+        nombre:
+          type: string
+        sprite:
+          type: string
+          format: uri
+    RespuestaListaPokemon:
+      type: object
+      required:
+        - items
+        - siguienteCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PokemonLista"
+        siguienteCursor:
+          type:
+            - string
+            - "null"
+    EstadisticaPokemon:
+      type: object
+      required:
+        - nombre
+        - valor
+      properties:
+        nombre:
+          type: string
+        valor:
+          type: integer
+          minimum: 0
+    HabilidadPokemon:
+      type: object
+      required:
+        - nombre
+        - oculta
+      properties:
+        nombre:
+          type: string
+        oculta:
+          type: boolean
+    PokemonDetalle:
+      allOf:
+        - $ref: "#/components/schemas/PokemonLista"
+        - type: object
+          required:
+            - tipos
+            - estadisticas
+            - habilidades
+          properties:
+            tipos:
+              type: array
+              items:
+                type: string
+            estadisticas:
+              type: array
+              items:
+                $ref: "#/components/schemas/EstadisticaPokemon"
+            habilidades:
+              type: array
+              items:
+                $ref: "#/components/schemas/HabilidadPokemon"
+    Favorito:
+      type: object
+      required:
+        - pokemonId
+        - nombre
+        - agregadoEn
+      properties:
+        pokemonId:
+          type: integer
+          minimum: 1
+        nombre:
+          type: string
+        agregadoEn:
+          type: string
+          format: date-time
+    RespuestaFavoritos:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Favorito"
+    RespuestaFavorito:
+      type: object
+      required:
+        - item
+      properties:
+        item:
+          $ref: "#/components/schemas/Favorito"
+    NuevoFavorito:
+      type: object
+      required:
+        - pokemonId
+      additionalProperties: false
+      properties:
+        pokemonId:
+          type: integer
+          minimum: 1
+    NuevaSesion:
+      type: object
+      required:
+        - idToken
+      additionalProperties: false
+      properties:
+        idToken:
+          type: string
+          minLength: 1
+    Usuario:
+      type: object
+      required:
+        - uid
+        - correo
+        - rol
+      properties:
+        uid:
+          type: string
+        correo:
+          type:
+            - string
+            - "null"
+          format: email
+        rol:
+          type:
+            - string
+            - "null"
+    RespuestaUsuario:
+      type: object
+      required:
+        - usuario
+      properties:
+        usuario:
+          $ref: "#/components/schemas/Usuario"
+  responses:
+    ErrorValidacion:
+      description: Parámetros o cuerpo inválido.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: Datos inválidos
+            detalles:
+              - campo: limite
+                mensaje: Number must be less than or equal to 100
+    NoAutenticado:
+      description: Falta una sesión válida o el token es inválido.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: No autenticado
+    NoEncontrado:
+      description: Pokémon no encontrado.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: No encontrado
+    ErrorInterno:
+      description: Error interno sin detalles sensibles.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: Error interno
+    DemasiadasSolicitudes:
+      description: PokéAPI rechazó la solicitud por límite de frecuencia.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ServicioNoDisponible:
+      description: PokéAPI no está disponible o devolvió datos inválidos.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    TiempoAgotado:
+      description: Se agotó el tiempo de espera al consultar PokéAPI.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    OrigenNoPermitido:
+      description: Origen de la petición no permitido.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflicto:
+      description: El Pokémon ya es favorito o se alcanzó el límite de 50.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    TipoNoPermitido:
+      description: Se requiere un cuerpo JSON.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"

@@ -1,0 +1,15 @@
+meta {
+  name: Sin sesión 401
+  type: http
+  seq: 3
+}
+
+get {
+  url: http://localhost:3000/api/favoritos
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer token-invalido
+}
